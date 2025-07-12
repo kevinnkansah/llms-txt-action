@@ -20,6 +20,8 @@ Create a workflow file (e.g., `.github/workflows/update-llms.yml`) in your repos
 
 ```yaml
 name: Update LLMs.txt
+permissions:
+  contents: write
 on:
   push:
     branches: [ main ]
@@ -31,17 +33,18 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Generate llms.txt
-        uses: kevinnkansah/llms-txt-action@v1
+        uses: kevinnkansah/llms-txt-action@v1.0.1
         with:
-          domain: https://your-website.com
+          domain: https://dewflow.xyz
           outputFile: public/llms.txt
-          jina_api_key: ${{ secrets.JINA_API_KEY }} # Optional, but recommended
 
       - name: Commit and push llms.txt
         uses: EndBug/add-and-commit@v9
         with:
-          add: 'public/llms.txt'
-          message: 'chore: update llms.txt'
+          author_name: 'username' 
+          author_email: 'email' # Ensure your repo is private if you don't want to expose your email
+          add: 'public/llms.txt' # Path to add llms.txt
+          message: 'chore: update llms.txt' # Commit message
 ```
 
 ## Inputs
