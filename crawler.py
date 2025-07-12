@@ -1,0 +1,155 @@
+#!/usr/bin/env python3
+"""
+This script discovers and crawls all pages in a website's sitemap(s)
+using the Jina AI Reader API and aggregates the content into a single file.
+"""
+import os
+import sys
+import asyncio
+from pathlib import Path
+from urllib.parse import urljoin, urlparse
+import httpx
+from bs4 import BeautifulSoup
+
+# --- Configuration ---
+JINA_API_URL = "https://r.jina.ai/"
+SITEMAP_PATHS = ["/sitemap.xml", "/sitemap_index.xml"]
+
+# --- Helper Functions ---
+
+async def fetch_url(client, url):
+    """Fetches content from a URL.
+    Returns the response object or None on failure.
+    """
+    try:
+        response = await client.get(url, follow_redirects=True)
+        response.raise_for_status()
+        return response
+    except httpx.RequestError as e:
+        print(f"- Skipping {url}: Request failed: {e}")
+        return None
+
+async def fetch_page_content_from_jina(client, page_url, headers):
+    """Fetches markdown content for a single page URL from Jina API.
+    Returns a tuple of (url, content) or None.
+    """
+    try:
+        response = await client.get(f"{JINA_API_URL}{page_url}", headers=headers)
+        response.raise_for_status()
+        data = response.json().get("data")
+        if data and data.get("content"):
+            return (data.get("url"), data.get("content"))
+    except httpx.HTTPStatusError as e:
+        print(f"- Skipping {page_url}: Jina API failed with status {e.response.status_code}")
+    except Exception as e:
+        print(f"- Skipping {page_url}: An unexpected error occurred: {e}")
+    return None
+
+async def find_sitemap_urls(client, domain):
+    """Discovers sitemap URLs from robots.txt or common paths.
+    Returns a list of sitemap URLs.
+    """
+    # 1. Check robots.txt
+    robots_url = urljoin(domain, "/robots.txt")
+    response = await fetch_url(client, robots_url)
+    if response:
+        for line in response.text.splitlines():
+            if line.lower().startswith("sitemap:"):
+                return [line.split(":", 1)[1].strip()]
+
+    # 2. Check common paths
+    for path in SITEMAP_PATHS:
+        sitemap_url = urljoin(domain, path)
+        response = await fetch_url(client, sitemap_url)
+        if response:
+            return [sitemap_url]
+            
+    return []
+
+async def parse_sitemap(client, sitemap_url):
+    """Parses a sitemap (or sitemap index) and returns a list of page URLs.
+    Recursively handles nested sitemaps.
+    """
+    page_urls = set()
+    response = await fetch_url(client, sitemap_url)
+    if not response:
+        return list(page_urls)
+
+    soup = BeautifulSoup(response.content, "xml")
+    
+    # Check for sitemap index
+    sitemap_tags = soup.find_all("sitemap")
+    if sitemap_tags:
+        nested_sitemap_urls = [tag.find("loc").text for tag in sitemap_tags]
+        tasks = [parse_sitemap(client, url) for url in nested_sitemap_urls]
+        results = await asyncio.gather(*tasks)
+        for result in results:
+            page_urls.update(result)
+    else:
+        # Regular sitemap
+        url_tags = soup.find_all("url")
+        for tag in url_tags:
+            loc = tag.find("loc")
+            if loc:
+                page_urls.add(loc.text)
+
+    return list(page_urls)
+
+# --- Main Execution ---
+
+async def main():
+    """Main function to orchestrate the crawling process."""
+    domain = os.environ.get('INPUT_DOMAIN')
+    output_file = os.environ.get('INPUT_OUTPUTFILE', 'public/llms.txt')
+    api_key = os.environ.get('INPUT_JINA_API_KEY')
+
+    if not domain:
+        print("Error: INPUT_DOMAIN is not set.", file=sys.stderr)
+        sys.exit(1)
+
+    if not domain.startswith(('http://', 'https://')):
+        domain = f"https://{domain}"
+
+    headers = {"Accept": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        print(f"🔍 Discovering sitemaps for {domain}...")
+        sitemap_urls = await find_sitemap_urls(client, domain)
+        if not sitemap_urls:
+            print("❌ No sitemap found. Cannot proceed.", file=sys.stderr)
+            sys.exit(1)
+
+        print(f"🗺️ Found sitemap(s): {', '.join(sitemap_urls)}")
+        
+        all_page_urls = []
+        for url in sitemap_urls:
+            all_page_urls.extend(await parse_sitemap(client, url))
+
+        if not all_page_urls:
+            print("No URLs found in sitemap(s).", file=sys.stderr)
+            sys.exit(0)
+
+        print(f"Found {len(all_page_urls)} URLs. Fetching content from Jina AI...")
+
+        tasks = [fetch_page_content_from_jina(client, url, headers) for url in all_page_urls]
+        results = await asyncio.gather(*tasks)
+
+        successful_pages = [res for res in results if res is not None]
+
+    if not successful_pages:
+        print("No content could be fetched for any URL.", file=sys.stderr)
+        sys.exit(0)
+
+    # Aggregate and write content
+    all_content = [f"# Source: {url}\n\n{content}" for url, content in successful_pages]
+    output_path = Path(output_file)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write('\n\n---\n\n'.join(all_content))
+
+    print(f"✅ Wrote content from {len(successful_pages)} pages to {output_file}")
+
+if __name__ == "__main__":
+    asyncio.run(main())

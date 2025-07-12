@@ -1,0 +1,24 @@
+[project]
+name = "llms-txt-action"
+version = "0.1.0"
+description = "A GitHub Action to crawl a site and generate a llms.txt file."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "httpx",
+    "beautifulsoup4",
+    "lxml"
+]
+
+[project.optional-dependencies]
+dev = [
+    "commitizen",
+    "pre-commit",
+]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "v$version"
+version_files = [
+    "pyproject.toml:version"
+]

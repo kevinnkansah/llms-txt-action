@@ -1,0 +1,36 @@
+name: 'Build LLMs.txt'
+description: 'Crawl a site using Jina AI Reader and compile all pages into llms.txt'
+author: 'Your Name'
+inputs:
+  domain:
+    description: 'The full URL of your site, e.g. https://example.com'
+    required: true
+  outputFile:
+    description: 'Where to write the merged text'
+    required: false
+    default: 'public/llms.txt'
+  jina_api_key:
+    description: 'API key for Jina AI Reader API'
+    required: false
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    - name: Install dependencies
+      shell: bash
+      run: |
+        pip install uv
+        uv pip install httpx beautifulsoup4 lxml --system
+    - name: Run crawler
+      shell: bash
+      run: python ${{ github.action_path }}/crawler.py
+      env:
+        INPUT_DOMAIN: ${{ inputs.domain }}
+        INPUT_OUTPUTFILE: ${{ inputs.outputFile }}
+        INPUT_JINA_API_KEY: ${{ inputs.jina_api_key }}
+branding:
+  icon: 'book-open'
+  color: 'blue'
