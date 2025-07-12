@@ -31,16 +31,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Generate llms.txt
-        uses: kevin-automation-architects/llms-txt-action@v1
+        uses: kevinnkansah/llms-txt-action@v1
         with:
           domain: https://your-website.com
-          outputFile: content/llms.txt
+          outputFile: public/llms.txt
           jina_api_key: ${{ secrets.JINA_API_KEY }} # Optional, but recommended
 
       - name: Commit and push llms.txt
         uses: EndBug/add-and-commit@v9
         with:
-          add: 'content/llms.txt'
+          add: 'public/llms.txt'
           message: 'chore: update llms.txt'
 ```
 
