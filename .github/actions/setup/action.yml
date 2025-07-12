@@ -1,0 +1,11 @@
+name: Setup UV Action
+description: Set up UV for use in workflows
+
+runs:
+  using: composite
+  steps:
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "0.7.3"
+     
