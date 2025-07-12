@@ -3,11 +3,12 @@
 This script discovers and crawls all pages in a website's sitemap(s)
 using the Jina AI Reader API and aggregates the content into a single file.
 """
+
 import os
 import sys
 import asyncio
 from pathlib import Path
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 import httpx
 from bs4 import BeautifulSoup
 
@@ -16,6 +17,7 @@ JINA_API_URL = "https://r.jina.ai/"
 SITEMAP_PATHS = ["/sitemap.xml", "/sitemap_index.xml"]
 
 # --- Helper Functions ---
+
 
 async def fetch_url(client, url):
     """Fetches content from a URL.
@@ -29,6 +31,7 @@ async def fetch_url(client, url):
         print(f"- Skipping {url}: Request failed: {e}")
         return None
 
+
 async def fetch_page_content_from_jina(client, page_url, headers):
     """Fetches markdown content for a single page URL from Jina API.
     Returns a tuple of (url, content) or None.
@@ -40,10 +43,13 @@ async def fetch_page_content_from_jina(client, page_url, headers):
         if data and data.get("content"):
             return (data.get("url"), data.get("content"))
     except httpx.HTTPStatusError as e:
-        print(f"- Skipping {page_url}: Jina API failed with status {e.response.status_code}")
+        print(
+            f"- Skipping {page_url}: Jina API failed with status {e.response.status_code}"
+        )
     except Exception as e:
         print(f"- Skipping {page_url}: An unexpected error occurred: {e}")
     return None
+
 
 async def find_sitemap_urls(client, domain):
     """Discovers sitemap URLs from robots.txt or common paths.
@@ -63,8 +69,9 @@ async def find_sitemap_urls(client, domain):
         response = await fetch_url(client, sitemap_url)
         if response:
             return [sitemap_url]
-            
+
     return []
+
 
 async def parse_sitemap(client, sitemap_url):
     """Parses a sitemap (or sitemap index) and returns a list of page URLs.
@@ -76,7 +83,7 @@ async def parse_sitemap(client, sitemap_url):
         return list(page_urls)
 
     soup = BeautifulSoup(response.content, "xml")
-    
+
     # Check for sitemap index
     sitemap_tags = soup.find_all("sitemap")
     if sitemap_tags:
@@ -95,19 +102,22 @@ async def parse_sitemap(client, sitemap_url):
 
     return list(page_urls)
 
+
 # --- Main Execution ---
+
 
 async def main():
     """Main function to orchestrate the crawling process."""
-    domain = os.environ.get('INPUT_DOMAIN')
-    output_file = os.environ.get('INPUT_OUTPUTFILE', 'public/llms.txt')
-    api_key = os.environ.get('INPUT_JINA_API_KEY')
+    domain = os.environ.get("INPUT_DOMAIN")
+    output_file = os.environ.get("INPUT_OUTPUTFILE", "public/llms.txt")
+    api_key = os.environ.get("INPUT_JINA_API_KEY")
 
-    if not domain:
+    if domain is None:
         print("Error: INPUT_DOMAIN is not set.", file=sys.stderr)
-        sys.exit(1)
+        return
 
-    if not domain.startswith(('http://', 'https://')):
+    # Ensure domain has a scheme
+    if not domain.startswith(("http://", "https://")):
         domain = f"https://{domain}"
 
     headers = {"Accept": "application/json"}
@@ -119,37 +129,40 @@ async def main():
         sitemap_urls = await find_sitemap_urls(client, domain)
         if not sitemap_urls:
             print("❌ No sitemap found. Cannot proceed.", file=sys.stderr)
-            sys.exit(1)
+            return
 
         print(f"🗺️ Found sitemap(s): {', '.join(sitemap_urls)}")
-        
+
         all_page_urls = []
         for url in sitemap_urls:
             all_page_urls.extend(await parse_sitemap(client, url))
 
         if not all_page_urls:
             print("No URLs found in sitemap(s).", file=sys.stderr)
-            sys.exit(0)
+            return
 
         print(f"Found {len(all_page_urls)} URLs. Fetching content from Jina AI...")
 
-        tasks = [fetch_page_content_from_jina(client, url, headers) for url in all_page_urls]
+        tasks = [
+            fetch_page_content_from_jina(client, url, headers) for url in all_page_urls
+        ]
         results = await asyncio.gather(*tasks)
 
         successful_pages = [res for res in results if res is not None]
 
     if not successful_pages:
         print("No content could be fetched for any URL.", file=sys.stderr)
-        sys.exit(0)
+        return
 
     # Aggregate and write content
     all_content = [f"# Source: {url}\n\n{content}" for url, content in successful_pages]
     output_path = Path(output_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(output_path, 'w', encoding='utf-8') as f:
-        f.write('\n\n---\n\n'.join(all_content))
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write("\n\n---\n\n".join(all_content))
 
     print(f"✅ Wrote content from {len(successful_pages)} pages to {output_file}")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

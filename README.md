@@ -29,7 +29,7 @@ jobs:
       - name: Run LLMs crawler
         uses: you/build-llms-action@v1 # Replace with your action's repo
         with:
-          domain: https://r.jina.ai
+          domain: your-domain.com
           outputFile: public/llms.txt
           jina_api_key: ${{ secrets.JINA_API_KEY }} # Optional, but recommended
 
