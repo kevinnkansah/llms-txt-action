@@ -15,10 +15,11 @@ from bs4 import BeautifulSoup
 # Optional Firecrawl import
 try:
     from firecrawl import AsyncFirecrawlApp
+
     FIRECRAWL_AVAILABLE = True
 except ImportError:
     FIRECRAWL_AVAILABLE = False
-    AsyncFirecrawlApp = None
+    AsyncFirecrawlApp = None  # type: ignore[misc]
 
 # --- Configuration ---
 JINA_API_URL = "https://r.jina.ai/"
@@ -63,9 +64,9 @@ async def fetch_page_content_from_firecrawl(firecrawl_app, page_url):
     Returns a tuple of (url, content) or None.
     """
     try:
-        result = await firecrawl_app.scrape_url(page_url, formats=['markdown'])
-        if result and result.get('markdown'):
-            return (page_url, result.get('markdown'))
+        result = await firecrawl_app.scrape_url(page_url, formats=["markdown"])
+        if result and result.get("markdown"):
+            return (page_url, result.get("markdown"))
     except Exception as e:
         print(f"- Skipping {page_url}: Firecrawl API failed: {e}")
     return None
@@ -140,15 +141,24 @@ async def main():
 
     # Validate backend selection
     if backend not in ["jina", "firecrawl"]:
-        print(f"Error: Invalid backend '{backend}'. Must be 'jina' or 'firecrawl'.", file=sys.stderr)
+        print(
+            f"Error: Invalid backend '{backend}'. Must be 'jina' or 'firecrawl'.",
+            file=sys.stderr,
+        )
         return
-    
+
     if backend == "firecrawl":
         if not FIRECRAWL_AVAILABLE:
-            print("Error: Firecrawl backend selected but firecrawl-py is not installed.", file=sys.stderr)
+            print(
+                "Error: Firecrawl backend selected but firecrawl-py is not installed.",
+                file=sys.stderr,
+            )
             return
         if not firecrawl_api_key:
-            print("Error: Firecrawl backend selected but INPUT_FIRECRAWL_API_KEY is not set.", file=sys.stderr)
+            print(
+                "Error: Firecrawl backend selected but INPUT_FIRECRAWL_API_KEY is not set.",
+                file=sys.stderr,
+            )
             return
 
     # Ensure domain has a scheme
@@ -176,17 +186,21 @@ async def main():
             print("No URLs found in sitemap(s).", file=sys.stderr)
             return
 
-        print(f"Found {len(all_page_urls)} URLs. Fetching content from {backend.title()}...")
+        print(
+            f"Found {len(all_page_urls)} URLs. Fetching content from {backend.title()}..."
+        )
 
         if backend == "jina":
             tasks = [
-                fetch_page_content_from_jina(client, url, headers) for url in all_page_urls
+                fetch_page_content_from_jina(client, url, headers)
+                for url in all_page_urls
             ]
             results = await asyncio.gather(*tasks)
         else:  # firecrawl
             firecrawl_app = AsyncFirecrawlApp(api_key=firecrawl_api_key)
             tasks = [
-                fetch_page_content_from_firecrawl(firecrawl_app, url) for url in all_page_urls
+                fetch_page_content_from_firecrawl(firecrawl_app, url)
+                for url in all_page_urls
             ]
             results = await asyncio.gather(*tasks)
 
