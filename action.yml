@@ -9,8 +9,15 @@ inputs:
     description: 'Where to write the merged text'
     required: false
     default: 'public/llms.txt'
+  backend:
+    description: 'Content extraction backend: "jina" (default, free) or "firecrawl" (requires API key)'
+    required: false
+    default: 'jina'
   jina_api_key:
-    description: 'API key for Jina AI Reader API'
+    description: 'API key for Jina AI Reader API (optional for Jina backend)'
+    required: false
+  firecrawl_api_key:
+    description: 'API key for Firecrawl API (required when using Firecrawl backend)'
     required: false
 runs:
   using: 'composite'
@@ -23,14 +30,16 @@ runs:
       shell: bash
       run: |
         pip install uv
-        uv pip install httpx beautifulsoup4 lxml --system
+        uv pip install httpx beautifulsoup4 lxml firecrawl-py --system
     - name: Run crawler
       shell: bash
       run: python ${{ github.action_path }}/crawler.py
       env:
         INPUT_DOMAIN: ${{ inputs.domain }}
         INPUT_OUTPUTFILE: ${{ inputs.outputFile }}
+        INPUT_BACKEND: ${{ inputs.backend }}
         INPUT_JINA_API_KEY: ${{ inputs.jina_api_key }}
+        INPUT_FIRECRAWL_API_KEY: ${{ inputs.firecrawl_api_key }}
 branding:
   icon: 'book-open'
   color: 'blue'

@@ -12,6 +12,14 @@ from urllib.parse import urljoin
 import httpx
 from bs4 import BeautifulSoup
 
+# Optional Firecrawl import
+try:
+    from firecrawl import AsyncFirecrawlApp
+    FIRECRAWL_AVAILABLE = True
+except ImportError:
+    FIRECRAWL_AVAILABLE = False
+    AsyncFirecrawlApp = None
+
 # --- Configuration ---
 JINA_API_URL = "https://r.jina.ai/"
 SITEMAP_PATHS = ["/sitemap.xml", "/sitemap_index.xml"]
@@ -48,6 +56,18 @@ async def fetch_page_content_from_jina(client, page_url, headers):
         )
     except Exception as e:
         print(f"- Skipping {page_url}: An unexpected error occurred: {e}")
+
+
+async def fetch_page_content_from_firecrawl(firecrawl_app, page_url):
+    """Fetches markdown content for a single page URL from Firecrawl API.
+    Returns a tuple of (url, content) or None.
+    """
+    try:
+        result = await firecrawl_app.scrape_url(page_url, formats=['markdown'])
+        if result and result.get('markdown'):
+            return (page_url, result.get('markdown'))
+    except Exception as e:
+        print(f"- Skipping {page_url}: Firecrawl API failed: {e}")
     return None
 
 
@@ -110,19 +130,34 @@ async def main():
     """Main function to orchestrate the crawling process."""
     domain = os.environ.get("INPUT_DOMAIN")
     output_file = os.environ.get("INPUT_OUTPUTFILE", "public/llms.txt")
-    api_key = os.environ.get("INPUT_JINA_API_KEY")
+    backend = os.environ.get("INPUT_BACKEND", "jina").lower()
+    jina_api_key = os.environ.get("INPUT_JINA_API_KEY")
+    firecrawl_api_key = os.environ.get("INPUT_FIRECRAWL_API_KEY")
 
     if domain is None:
         print("Error: INPUT_DOMAIN is not set.", file=sys.stderr)
         return
+
+    # Validate backend selection
+    if backend not in ["jina", "firecrawl"]:
+        print(f"Error: Invalid backend '{backend}'. Must be 'jina' or 'firecrawl'.", file=sys.stderr)
+        return
+    
+    if backend == "firecrawl":
+        if not FIRECRAWL_AVAILABLE:
+            print("Error: Firecrawl backend selected but firecrawl-py is not installed.", file=sys.stderr)
+            return
+        if not firecrawl_api_key:
+            print("Error: Firecrawl backend selected but INPUT_FIRECRAWL_API_KEY is not set.", file=sys.stderr)
+            return
 
     # Ensure domain has a scheme
     if not domain.startswith(("http://", "https://")):
         domain = f"https://{domain}"
 
     headers = {"Accept": "application/json"}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
+    if jina_api_key and backend == "jina":
+        headers["Authorization"] = f"Bearer {jina_api_key}"
 
     async with httpx.AsyncClient(timeout=60.0) as client:
         print(f"🔍 Discovering sitemaps for {domain}...")
@@ -141,12 +176,19 @@ async def main():
             print("No URLs found in sitemap(s).", file=sys.stderr)
             return
 
-        print(f"Found {len(all_page_urls)} URLs. Fetching content from Jina AI...")
+        print(f"Found {len(all_page_urls)} URLs. Fetching content from {backend.title()}...")
 
-        tasks = [
-            fetch_page_content_from_jina(client, url, headers) for url in all_page_urls
-        ]
-        results = await asyncio.gather(*tasks)
+        if backend == "jina":
+            tasks = [
+                fetch_page_content_from_jina(client, url, headers) for url in all_page_urls
+            ]
+            results = await asyncio.gather(*tasks)
+        else:  # firecrawl
+            firecrawl_app = AsyncFirecrawlApp(api_key=firecrawl_api_key)
+            tasks = [
+                fetch_page_content_from_firecrawl(firecrawl_app, url) for url in all_page_urls
+            ]
+            results = await asyncio.gather(*tasks)
 
         successful_pages = [res for res in results if res is not None]
 

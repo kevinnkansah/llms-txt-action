@@ -49,15 +49,47 @@ jobs:
 
 ## Inputs
 
-| Name           | Required | Description                                                                                                | Default              |
-|----------------|----------|------------------------------------------------------------------------------------------------------------|----------------------|
-| `domain`       | **Yes**  | The full URL of the site to crawl (e.g., `https://example.com`).                                            |                      |
-| `outputFile`   | No       | The path where the final `llms.txt` file will be saved.                                                    | `public/llms.txt`    |
-| `jina_api_key` | No       | Your Jina AI Reader API key. Recommended for higher rate limits. Store this as a [GitHub Secret](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions). |                      |
+| Name                | Required | Description                                                                                                | Default              |
+|---------------------|----------|------------------------------------------------------------------------------------------------------------|----------------------|
+| `domain`            | **Yes**  | The full URL of the site to crawl (e.g., `https://example.com`).                                            |                      |
+| `outputFile`        | No       | The path where the final `llms.txt` file will be saved.                                                    | `public/llms.txt`    |
+| `backend`           | No       | Content extraction backend: `"jina"` (free) or `"firecrawl"` (requires API key).                        | `jina`               |
+| `jina_api_key`      | No       | Your Jina AI Reader API key. Optional for Jina backend, recommended for higher rate limits. Store this as a [GitHub Secret](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions). |                      |
+| `firecrawl_api_key` | No       | Your Firecrawl API key. Required when using Firecrawl backend. Get one from [firecrawl.dev](https://firecrawl.dev). Store this as a [GitHub Secret](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions). |                      |
 
 ## How It Works
 
-This action first attempts to find your sitemap by checking `/robots.txt` and common paths like `/sitemap.xml`. It then parses the sitemap(s) to get a list of all page URLs. For each URL, it calls the Jina AI Reader API (`https://r.jina.ai/`) to fetch the content as clean markdown. Finally, it aggregates the content from all pages into the specified `outputFile`.
+This action first attempts to find your sitemap by checking `/robots.txt` and common paths like `/sitemap.xml`. It then parses the sitemap(s) to get a list of all page URLs. For each URL, it uses the selected backend to fetch the content as clean markdown:
+
+- **Jina Backend (Default)**: Uses the free Jina AI Reader API (`https://r.jina.ai/`) 
+- **Firecrawl Backend**: Uses the Firecrawl API for more advanced crawling capabilities
+
+Finally, it aggregates the content from all pages into the specified `outputFile`.
+
+## Usage Examples
+
+### Using Jina Backend (Default)
+
+```yaml
+- name: Generate llms.txt with Jina
+  uses: kevinnkansah/llms-txt-action@v1.0.1
+  with:
+    domain: https://dewflow.xyz
+    outputFile: public/llms.txt
+    # backend: jina  # Optional, this is the default
+```
+
+### Using Firecrawl Backend
+
+```yaml
+- name: Generate llms.txt with Firecrawl
+  uses: kevinnkansah/llms-txt-action@v1.0.1
+  with:
+    domain: https://dewflow.xyz
+    outputFile: public/llms.txt
+    backend: firecrawl
+    firecrawl_api_key: ${{ secrets.FIRECRAWL_API_KEY }}
+```
 
 ## Development
 
