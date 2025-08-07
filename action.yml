@@ -1,5 +1,5 @@
 name: 'Autogenerate LLMs.txt file simply'
-description: 'This GitHub Action automatically crawls your website pages using the Jina AI Reader API/Firecrawl API and compiles every page’s clean, Markdown-formatted content into a single `llms.txt` file—perfect for building an up-to-date LLM training corpus or powering search indexing in your CI/CD workflow'
+description: 'Automatically generate an llms.txt file for your website or documentation for free and integrate it into your CI/CD pipeline.'
 author: 'Kevin Nkansah'
 inputs:
   domain:
