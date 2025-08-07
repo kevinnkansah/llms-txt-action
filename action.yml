@@ -1,6 +1,6 @@
-name: 'Build LLMs.txt'
-description: 'Crawl a site using Jina AI Reader and compile all pages into llms.txt'
-author: 'Your Name'
+name: 'Autogenerate LLMs.txt file simply'
+description: 'This GitHub Action automatically crawls your website pages using the Jina AI Reader API/Firecrawl API and compiles every page’s clean, Markdown-formatted content into a single `llms.txt` file—perfect for building an up-to-date LLM training corpus or powering search indexing in your CI/CD workflow'
+author: 'Kevin Nkansah'
 inputs:
   domain:
     description: 'The full URL of your site, e.g. https://example.com'
